@@ -319,7 +319,7 @@ begin
 		# Time-offset the wave before capture to make the equation simpler
 		# Remember that time and space have a different direction on the plots
 		Ê₁ₛₒₗ = sol(T)
-		neuronpulse = use_sub ? Ê₁ₛₒₗ[:,0] : Ê₁ₛₒₗ[:,1]
+		neuronpulse = use_sub ? Ê₁ₛₒₗ[:,2] : Ê₁ₛₒₗ[:,1]
 		Sᵢₙ(t) = LinearInterpolation(knots,neuronpulse)(-t+offset*w+T)
 
 		# Solve the capture
@@ -456,7 +456,7 @@ let
 					sim = nonlinsim(w=w,kz₀εₛ²εₙ⁻¹=kz₀εₛ²εₙ⁻¹,kz₀εₙ=kz₀εₙ,
 									αz₀=αz₀,γₕ=γₕ,φ₀=φ₀)
 					A = sim.capturesol[end]
-					println("φ₀=$(φ₀), εₙεₛ⁻¹=$(εₙεₛ⁻¹), kz₀εₛ=$(kz₀εₛ)")
+					@info "φ₀=$(φ₀), εₙεₛ⁻¹=$(εₙεₛ⁻¹), kz₀εₛ=$(kz₀εₛ)"
 					return A/Anorm
 				end
 				return As
@@ -514,9 +514,10 @@ md"# Instead of the pump being a subharmonic, what if the pump is the second har
 let
 	αz₀ = 0.0
 	γₕ = 0.0
-	
-	global kz₀εₙs = [0, 0.2, 0.3] .* 0.025
-	εₛεₙ⁻¹_scale = 20.0
+
+	global φs_ = range(0,pi,length=18)
+	global kz₀εₙs = [1.0,2.0,3.0]
+	εₛεₙ⁻¹_scale = 0.5
 	global εₛεₙ⁻¹s = ((0:0.1:1) .+ 1e-2)*εₛεₙ⁻¹_scale
 
 	if isfile("nonlins_inverted.npz")
@@ -525,16 +526,16 @@ let
 	else
 		global Asss_inverted_withφ = qmap(kz₀εₙs) do kz₀εₙ
 			Ass = qmap(εₛεₙ⁻¹s) do εₛεₙ⁻¹
-				As = qmap(φs) do φ₀
+				As = qmap(φs_) do φ₀
 					kz₀εₛ²εₙ⁻¹ = kz₀εₙ*εₛεₙ⁻¹^2
 					kz₀εₙ_ = kz₀εₙ
 					sim = nonlinsim(w=w,
 						kz₀εₛ²εₙ⁻¹=kz₀εₛ²εₙ⁻¹,kz₀εₙ=kz₀εₙ_,
 						αz₀=αz₀,γₕ=γₕ,
 						φ₀=φ₀,
-						use_sub=false)
+						use_sub=true)
 					A = sim.capturesol[end]
-					println("φ₀=$(φ₀), εₛεₙ⁻¹=$(εₛεₙ⁻¹), kz₀εₛ=$(kz₀εₙ)")
+					@info "φ₀=$(φ₀), εₛεₙ⁻¹=$(εₛεₙ⁻¹), kz₀εₛ=$(kz₀εₙ)"
 					return A/Anorm
 				end
 				return As
@@ -546,14 +547,14 @@ let
 											 dims=(3,))
 		npzwrite("nonlins_inverted.npz",
 			kze=kz₀εₙs,es_over_en=collect(εₛεₙ⁻¹s),
-			allA=Asss_inverted_withφ_cat.*εₛεₙ⁻¹s',phis=φs);
+			allA=Asss_inverted_withφ_cat.*εₛεₙ⁻¹s',phis=φs_);
 	end
 end;
 
 # ╔═╡ 594db84f-1d44-4dbb-8f40-3bf743303f0a
 let
-	data = Asss_inverted_withφ_cat[:,:,3]
-	plot(φs, angle.(data), linez=εₛεₙ⁻¹s',
+	data = Asss_inverted_withφ_cat[:,:,end]
+	plot(φs_, angle.(data), linez=εₛεₙ⁻¹s',
 		legend=false, colorbar=true, c=:batlow, colorbar_title="εₙεₛ⁻¹",
 	    #xlim=(0,0.97*pi), ylim=(-pi,0)
 	)
@@ -561,9 +562,10 @@ end
 
 # ╔═╡ 4acbc103-7e7e-40be-b0f4-4e905c59cbe0
 let
-	data = Asss_inverted_withφ_cat[1:end÷2,:,2]
+	data = Asss_inverted_withφ_cat[:,:,2]
 	plot(εₛεₙ⁻¹s, abs.(data)' .* εₛεₙ⁻¹s,
-		linez=φs[1:end÷2]',
+		#linez=φs_[1:end÷2]',
+		linez=φs_',
 		legend=false, colorbar=true, colorbar_title="input φ",
 		lw=2, c=:romaO, clim=(-pi,pi),
 	)
@@ -571,13 +573,13 @@ end
 
 # ╔═╡ e8f9590a-047b-4b65-a2b9-c23016e870f9
 let
-	i = 2
-	p1 = heatmap(φs,εₛεₙ⁻¹s,abs.(Asss_inverted_withφ_cat[:,:,i])',
+	i = 2 # there is a bug with the r-limits, so we manually rescale
+	p1 = heatmap(φs_,εₛεₙ⁻¹s*10,abs.(Asss_inverted_withφ_cat[:,:,i])',
     		aspect_ratio=:equal, proj=:polar, legend=false, colorbar=true,
 	        c=:broc,
 	        clim=(0.,2.), colorbar_title=" \nOutput/Input Ratio", right_margin=3mm,
 			yticks=[])
-	p2 = heatmap(φs,εₛεₙ⁻¹s,angle.(
+	p2 = heatmap(φs_,εₛεₙ⁻¹s*10,angle.(
 			Asss_inverted_withφ_cat[:,:,i])',
 		    aspect_ratio=:equal, proj=:polar, legend=false, colorbar=true,
             c=:romaO,
