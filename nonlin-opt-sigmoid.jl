@@ -515,10 +515,10 @@ let
 	αz₀ = 0.0
 	γₕ = 0.0
 
-	global φs_ = range(0,pi,length=18)
+	global φs_ = range(0,2pi,length=36)
 	global kz₀εₙs = [1.0,2.0,3.0]
 	εₛεₙ⁻¹_scale = 0.5
-	global εₛεₙ⁻¹s = ((0:0.1:1) .+ 1e-2)*εₛεₙ⁻¹_scale
+	global εₛεₙ⁻¹s = ((0:0.05:1) .+ 1e-2)*εₛεₙ⁻¹_scale
 
 	if isfile("nonlins_inverted.npz")
 		f = npzread("nonlins_inverted.npz")
